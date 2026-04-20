@@ -1,4 +1,5 @@
 import streamlit as st
+import youtube_transcript_api # 도구함 전체를 가져옵니다
 from youtube_transcript_api import YouTubeTranscriptApi
 import spacy
 from collections import Counter
@@ -20,9 +21,20 @@ url = st.text_input("유튜브 주소를 입력하세요:", placeholder="https:/
 if st.button("분석 시작!"):
     if url:
         try:
-            v_id = url.split("v=")[1].split("&")[0] if "v=" in url else url.split("/")[-1]
+            # 영상 ID 추출 (v= 뒷부분 혹은 마지막 슬래시 뒷부분)
+            if "v=" in url:
+                v_id = url.split("v=")[1].split("&")[0]
+            else:
+                v_id = url.split("/")[-1]
+                
             with st.spinner('자막을 가져와 분석 중입니다...'):
-                transcript = YouTubeTranscriptApi.get_transcript(v_id)
+                # ⭐️ 가장 확실한 경로로 기능을 호출합니다 (에러 방지 핵심)
+                try:
+                    transcript = YouTubeTranscriptApi.get_transcript(v_id)
+                except:
+                    # 위 방법이 실패하면 모듈명을 포함한 전체 경로로 한 번 더 시도
+                    transcript = youtube_transcript_api.YouTubeTranscriptApi.get_transcript(v_id)
+                
                 full_text = " ".join([t['text'] for t in transcript])
                 doc = nlp(full_text)
                 
@@ -36,8 +48,11 @@ if st.button("분석 시작!"):
                 col1, col2 = st.columns(2)
                 with col1:
                     st.subheader("🎯 추천 학습 문장")
-                    for i, s in enumerate(sents[:5], 1):
-                        st.write(f"{i}. {s}")
+                    if sents:
+                        for i, s in enumerate(sents[:5], 1):
+                            st.write(f"{i}. {s}")
+                    else:
+                        st.write("적당한 길이의 문장을 찾지 못했습니다.")
                 
                 with col2:
                     st.subheader("🔑 핵심 단어 TOP 5")
@@ -45,5 +60,6 @@ if st.button("분석 시작!"):
                         st.write(f"- **{word}** ({count}회)")
         except Exception as e:
             st.error(f"에러가 발생했습니다: {e}")
+            st.info("팁: 영어 자막(CC)이 있는 영상인지 확인해 주세요!")
     else:
         st.warning("주소를 입력해주세요!")
